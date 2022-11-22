@@ -8,13 +8,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// RabbitWorker описывает функцию для работы с соединением RabbitMQ.
-type RabbitWorker = func(*amqp091.Channel) error
+// Worker описывает функцию для работы с соединением RabbitMQ.
+type Worker = func(*amqp091.Channel) error
 
 // Init запускает асинхронное выполнение процессов работы с RabbitMQ.
 // Ожидает начального завершения процесс инициализации и только после этого возвращает управление.
 // Внутри вызывает Run.
-func Init(ctx context.Context, addr string, workers ...RabbitWorker) (err error) {
+func Init(ctx context.Context, addr string, workers ...Worker) (err error) {
 	stop := make(chan struct{}) // канал для отслеживания инициализации
 	go func() {
 		defer close(stop) // по окончании или ошибке тоже закрываем, если не дошло до нашего сервиса
@@ -36,7 +36,7 @@ func Init(ctx context.Context, addr string, workers ...RabbitWorker) (err error)
 //
 // Плановое завершение работы сервисов осуществляется через контекст. Так же происходит остановка всех сервисов,
 // если хотя бы один из обработчиков возвращает ошибку.
-func Run(ctx context.Context, addr string, workers ...RabbitWorker) error {
+func Run(ctx context.Context, addr string, workers ...Worker) error {
 	// повторяем подключение в случае сбоя
 	for {
 		conn, err := Connect(addr) // подключаемся к серверу
