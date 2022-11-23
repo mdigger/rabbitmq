@@ -8,10 +8,13 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 )
 
+// Handler описывает функцию для обработки входящих сообщений.
+type Handler = func(amqp091.Delivery) error
+
 // SendReceive описывает сервис для посылки и приемке ответов
 type SendReceive struct {
-	Queue   string                       // имя внутренней очереди для получения ответов
-	Handler func(amqp091.Delivery) error // функция для обработки ответов
+	Queue   string  // имя внутренней очереди для получения ответов
+	Handler Handler // функция для обработки ответов
 
 	ch    *amqp091.Channel // подключение к серверу
 	queue string           // внутреннее сохраненное название очереди
@@ -19,7 +22,7 @@ type SendReceive struct {
 }
 
 // NewSendReceive возвращает инициализированный приёмку/отправку сообщений на RabbitMQ.
-func NewSendReceive(queue string, handler func(amqp091.Delivery) error) *SendReceive {
+func NewSendReceive(queue string, handler Handler) *SendReceive {
 	return &SendReceive{
 		Queue:   queue,
 		Handler: handler,
@@ -59,10 +62,7 @@ func (sr *SendReceive) Run(ch *amqp091.Channel) error {
 	sr.mu.Unlock()
 
 	for msg := range msgs {
-		err := sr.Handler(msg)
-		if err != nil {
-			return err
-		}
+		sr.Handler(msg) // вызываем обработчик входящего сообщения
 	}
 
 	return nil
