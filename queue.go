@@ -72,8 +72,8 @@ func (q *Queue) Consume(ch *amqp091.Channel, opts ...ConsumeOption) (<-chan amqp
 // Handler описывает функцию для обработки входящих сообщений.
 type Handler = func(amqp091.Delivery)
 
-// ConsumeHandleWorker инициализированный Worker с заданным обработчиком сообщений.
-func (q *Queue) ConsumeHandleWorker(handler Handler, opts ...ConsumeOption) Worker {
+// ConsumeWorkerWithHandler инициализированный Worker с заданным обработчиком сообщений.
+func (q *Queue) ConsumeWorkerWithHandler(handler Handler, opts ...ConsumeOption) Worker {
 	return func(ch *amqp091.Channel) error {
 		msgs, err := q.Consume(ch, opts...)
 		if err != nil {
@@ -95,7 +95,7 @@ func (q *Queue) ConsumeWorker(opts ...ConsumeOption) (<-chan amqp091.Delivery, W
 	handler := func(msg amqp091.Delivery) {
 		delivery <- msg
 	}
-	worker := q.ConsumeHandleWorker(handler, opts...)
+	worker := q.ConsumeWorkerWithHandler(handler, opts...)
 	return delivery, worker
 }
 
