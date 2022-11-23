@@ -112,6 +112,10 @@ func (q *Queue) Publisher(ch *amqp091.Channel, opts ...PublishOption) (Publisher
 	// возвращаем функцию для публикации
 	options := getPublishOpts(opts)
 	return func(ctx context.Context, msg amqp091.Publishing) error {
+		if ch.IsClosed() {
+			return ErrNoChannel
+		}
+
 		return ch.PublishWithContext(ctx, "", q.String(), options.Mandatory, options.Immediate, msg)
 	}, nil
 }
