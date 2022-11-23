@@ -120,7 +120,7 @@ func (q *Queue) Publisher(ch *amqp091.Channel, opts ...PublishOption) (Publisher
 var ErrNoChannel = errors.New("channel is not initialized")
 
 // PublishWorker возвращает функцию для публикации сообщений в очередь и обработчик для запуска процесса.
-func (q *Queue) PublishWorker(handler Handler, opts ...PublishOption) (Publisher, Worker) {
+func (q *Queue) PublishWorker(opts ...PublishOption) (Publisher, Worker) {
 	var channelPublisher atomic.Value // функция для публикации в канал
 
 	// функция для инициализации публикации при установке соединения
