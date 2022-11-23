@@ -9,7 +9,7 @@ import (
 )
 
 // Handler описывает функцию для обработки входящих сообщений.
-type Handler = func(amqp091.Delivery) error
+type Handler = func(amqp091.Delivery)
 
 // SendReceive описывает сервис для посылки и приемке ответов
 type SendReceive struct {
