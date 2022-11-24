@@ -13,8 +13,8 @@ var (
 )
 
 // Connect возвращает инициализированное подключение к серверу RabbitMQ.
-// В случае ошибки подключения попытка повторяется несколько раз (MaxIteration)
-// с небольшой задержкой (ReconnectTime).
+// В случае ошибки подключения попытка повторяется несколько раз (`MaxIteration`)
+// с небольшой задержкой (`ReconnectTime`).
 func Connect(addr string) (conn *amqp091.Connection, err error) {
 	for i := 0; i < MaxIteration; i++ {
 		conn, err = amqp091.Dial(addr) // подключаемся к серверу
