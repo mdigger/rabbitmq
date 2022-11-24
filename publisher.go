@@ -56,6 +56,9 @@ func Publish(opts ...PublishOption) (Publisher, Initializer) {
 		if exchange != "" {
 			log = log.Str("exchange", exchange)
 		}
+		if msg.MessageId != "" {
+			log = log.Str("messageId", msg.MessageId)
+		}
 		log.Msg("publishing")
 
 		publishingFunc := storedPublishingFunc.Load() // получаем функцию для публикации
