@@ -5,8 +5,6 @@ import (
 	"sync"
 
 	"github.com/rabbitmq/amqp091-go"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // Initializer является синонимом функции для инициализации канала соединения RabbitMQ.
@@ -18,9 +16,6 @@ type Initializer = func(*amqp091.Channel) error
 // Возвращает ошибку, если превышено количество попыток установки соединений.
 // Плановое завершение работы сервисов осуществляется через контекст.
 func Run(ctx context.Context, addr string, initializers ...Initializer) error {
-	log := log.With().Str("module", "rabbitmq").Logger()
-	amqp091.SetLogger(logger{Logger: log})
-
 	for {
 		log.Debug().Msg("connecting...")
 		conn, err := Connect(addr) // подключаемся к серверу
@@ -106,7 +101,3 @@ func Work(ctx context.Context, addr string, queue *Queue, handler Handler, opts 
 	}
 	return pubFunc, nil // возвращаем функцию публикации
 }
-
-type logger struct{ zerolog.Logger }
-
-func (l logger) Printf(format string, v ...any) { l.Logger.Printf(format, v...) }

@@ -2,7 +2,6 @@ package rabbitmq
 
 import (
 	"github.com/rabbitmq/amqp091-go"
-	"github.com/rs/zerolog/log"
 )
 
 // Queue описывает очередь сообщений.

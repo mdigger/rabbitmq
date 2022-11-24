@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,10 +51,4 @@ func TestWorker(t *testing.T) {
 
 	<-ctx.Done()
 	time.Sleep(time.Second)
-}
-
-func init() {
-	out := zerolog.NewConsoleWriter()
-	out.NoColor = true
-	log.Logger = log.Logger.Output(out)
 }
