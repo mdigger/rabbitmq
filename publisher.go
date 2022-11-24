@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog/log"
 )
 
 // Publisher описывает функцию для публикации сообщений на сервер RabbitMQ.
@@ -21,11 +22,16 @@ var ErrNoChannel = errors.New("channel is not initialized")
 // Если перед публикацией необходимо произвести некоторые настройки канала, то можно задать свою функцию инициализации
 // с помощью опции WithInit(ChannelHandler).
 func Publish(opts ...PublishOption) (Publisher, ChannelHandler) {
+	log := log.With().Str("module", "rabbitmq").Logger()
+	log.Debug().Msg("init publisher")
+
 	options := getPublishOpts(opts)       // суммарные опции для публикации
 	var storedPublishingFunc atomic.Value // для ссылки на функцию публикации
 
 	// обработчик подключения
 	worker := func(ch *amqp091.Channel) error {
+		log.Debug().Msg("init publishing worker")
+
 		// запускаем функцию инициализации сразу после установки соединения, если такая функция задана
 		if options.init != nil {
 			if err := options.init(ch); err != nil {
@@ -45,6 +51,8 @@ func Publish(opts ...PublishOption) (Publisher, ChannelHandler) {
 
 	// функция для публикации новых сообщений
 	publisher := func(ctx context.Context, exchange, key string, msg amqp091.Publishing) error {
+		log.Debug().Str("key", key).Str("exchange", exchange).Msg("publishing")
+
 		publishingFunc := storedPublishingFunc.Load() // получаем функцию для публикации
 		if publishingFunc == nil {
 			return ErrNoChannel // функция не инициализирована

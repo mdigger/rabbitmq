@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -19,7 +20,10 @@ type ChannelHandler = func(*amqp091.Channel) error
 // Возвращает ошибку, если превышено количество попыток установки соединений.
 // Плановое завершение работы сервисов осуществляется через контекст.
 func Run(ctx context.Context, addr string, workers ...ChannelHandler) error {
+	log := log.With().Str("module", "rabbitmq").Logger()
+
 	for {
+		log.Debug().Msg("connecting...")
 		conn, err := Connect(addr) // подключаемся к серверу
 		if err != nil {
 			return err // ошибка установки соединения
@@ -55,9 +59,11 @@ func Run(ctx context.Context, addr string, workers ...ChannelHandler) error {
 			runtime.Gosched() // позволить запуститься и отработать потоку
 		}
 
+		log.Debug().Msg("launched...")
 		group.Wait()          // ожидаем завершения всех обработчиков сервисов
 		conn.Close()          // закрываем соединение
 		if ctx.Err() != nil { // отслеживаем плановую остановку сервиса
+			log.Debug().Msg("stopped...")
 			return nil
 		}
 		// осуществляем повторное соединение и инициализацию
@@ -87,7 +93,8 @@ func Init(ctx context.Context, addr string, workers ...ChannelHandler) error {
 		err = Run(ctx, addr, append(workers, stopWorker)...)
 	}()
 
-	<-stop     // ожидаем завершения инициализации или её ошибки
+	<-stop // ожидаем завершения инициализации или её ошибки
+	log.Debug().Str("module", "rabbitmq").Err(err).Msg("initialized")
 	return err // возвращаем возможную ошибку первой инициализации
 }
 
