@@ -21,7 +21,7 @@ func Connect(addr string) (conn *amqp091.Connection, err error) {
 
 	for i := 0; i < MaxIteration; i++ {
 		conn, err = amqp091.Dial(addr) // подключаемся к серверу
-		log.Err(err).Msg("connection")
+		log.Debug().Err(err).Msg("connection")
 		if err == nil {
 			return conn, nil // в случае успешного подключения сразу возвращаем его
 		}
