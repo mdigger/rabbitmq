@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog/log"
 )
 
 // Queue описывает очередь сообщений.
@@ -43,6 +44,8 @@ func (q *Queue) declare(ch *amqp091.Channel) error {
 		q.Args,       // arguments
 	)
 	q.queue = queue.Name // сохраняем имя инициализированной очереди
+
+	log.Debug().Str("module", "rabbitmq").Str("queue", queue.Name).Msg("queue declare")
 	return err
 }
 

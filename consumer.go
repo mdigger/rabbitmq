@@ -1,6 +1,9 @@
 package rabbitmq
 
-import "github.com/rabbitmq/amqp091-go"
+import (
+	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog/log"
+)
 
 // Handler является синонимом для функции обработки входящих сообщений.
 type Handler = func(amqp091.Delivery)
@@ -10,6 +13,9 @@ type Handler = func(amqp091.Delivery)
 // По умолчанию включено автоматическое подтверждение приёма сообщения.
 // Для его отключения используйте опцию WithNoAutoAck(true).
 func Consume(queue *Queue, handler Handler, opts ...ConsumeOption) ChannelHandler {
+	log := log.With().Str("module", "rabbitmq").Stringer("queue", queue).Logger()
+	log.Debug().Msg("init consumer")
+
 	options := getConsumeOptions(opts) // обобщаем параметры настройки
 	worker := func(ch *amqp091.Channel) error {
 		// инициализируем настройки для очереди
@@ -27,6 +33,7 @@ func Consume(queue *Queue, handler Handler, opts ...ConsumeOption) ChannelHandle
 			options.noWait,     // no-wait
 			options.args,       // args
 		)
+		log.Debug().Err(err).Msg("init consume worker")
 		if err != nil {
 			return err
 		}
