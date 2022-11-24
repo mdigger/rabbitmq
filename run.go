@@ -17,7 +17,6 @@ type Initializer = func(*amqp091.Channel) error
 // Плановое завершение работы сервисов осуществляется через контекст.
 func Run(ctx context.Context, addr string, initializers ...Initializer) error {
 	for {
-		log.Debug().Msg("connecting...")
 		conn, err := Connect(addr) // подключаемся к серверу
 		if err != nil {
 			return err // ошибка установки соединения
@@ -32,25 +31,24 @@ func Run(ctx context.Context, addr string, initializers ...Initializer) error {
 			}
 			// инициализируем обработчик сервиса на заданном канале
 			if err = init(ch); err != nil {
+				ch.Close()
 				break
 			}
 		}
 
+		log.Debug().Err(err).Msg("initialized")
 		// ожидаем закрытия соединения или сигнала об остановке
 		if err == nil {
-			log.Debug().Msg("initialized...")
 			select {
 			case err = <-conn.NotifyClose(make(chan *amqp091.Error)):
 				log.Err(err).Msg("connection closed")
 			case <-ctx.Done(): // плановое завершение
 			}
-		} else {
-			log.Err(err).Msg("initialization")
 		}
 
 		conn.Close()                      // закрываем соединение
 		if err := ctx.Err(); err != nil { // отслеживаем плановую остановку сервиса
-			log.Debug().Str("reason", err.Error()).Msg("stopped...")
+			log.Debug().Str("reason", err.Error()).Msg("stopped")
 			return nil
 		}
 		// осуществляем повторное соединение и инициализацию
