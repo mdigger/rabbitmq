@@ -2,25 +2,24 @@ package rabbitmq
 
 import (
 	"context"
-	"runtime"
 	"sync"
 
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 )
 
-// ChannelHandler является синонимом функции для работы с соединением RabbitMQ.
-// Используется в качестве обработчиков соединения.
-type ChannelHandler = func(*amqp091.Channel) error
+// Initializer является синонимом функции для инициализации канала соединения RabbitMQ.
+type Initializer = func(*amqp091.Channel) error
 
 // Run осуществляет подключение к серверу RabbitMQ и инициализирует обработчики с этим соединением.
 // Для каждого обработчика создаётся отдельный канал, а в случае ошибки инициализации всё повторяется.
 //
 // Возвращает ошибку, если превышено количество попыток установки соединений.
 // Плановое завершение работы сервисов осуществляется через контекст.
-func Run(ctx context.Context, addr string, workers ...ChannelHandler) error {
+func Run(ctx context.Context, addr string, initializers ...Initializer) error {
 	log := log.With().Str("module", "rabbitmq").Logger()
+	amqp091.SetLogger(logger{Logger: log})
 
 	for {
 		log.Debug().Msg("connecting...")
@@ -29,41 +28,34 @@ func Run(ctx context.Context, addr string, workers ...ChannelHandler) error {
 			return err // ошибка установки соединения
 		}
 
-		// инициализируем группу обработчиков соединения
-		group, groupCtx := errgroup.WithContext(ctx)
-		// добавляем обработчик, который отслеживает ошибки соединения
-		group.Go(func() error {
-			select {
-			case err = <-conn.NotifyClose(make(chan *amqp091.Error)):
-				return err // при плановом закрытии ошибка будет пустая
-			case <-groupCtx.Done(): // плановое завершение
-				return nil
-			}
-		})
-
 		// запускаем зарегистрированные для данного соединения обработчики
-		for _, worker := range workers {
-			if groupCtx.Err() != nil {
-				break // прерываем инициализацию при ошибке в одном из сервисов, соединении или глобальной остановке
+		for _, init := range initializers {
+			var ch *amqp091.Channel
+			ch, err = conn.Channel() // для каждого сервиса создаём отдельный канал
+			if err != nil {
+				break
 			}
-
-			worker := worker // копируем в текущий стек
-			group.Go(func() error {
-				ch, err := conn.Channel() // для каждого сервиса создаём отдельный канал
-				if err != nil {
-					return err
-				}
-				return worker(ch) // инициализируем обработчик сервиса на заданном канале
-				// канал может использоваться и после закрытия обработчика, поэтому не закрываем его сами
-			})
-			runtime.Gosched() // позволить запуститься и отработать потоку
+			// инициализируем обработчик сервиса на заданном канале
+			if err = init(ch); err != nil {
+				break
+			}
 		}
 
-		log.Debug().Msg("launched...")
-		group.Wait()          // ожидаем завершения всех обработчиков сервисов
-		conn.Close()          // закрываем соединение
-		if ctx.Err() != nil { // отслеживаем плановую остановку сервиса
-			log.Debug().Msg("stopped...")
+		// ожидаем закрытия соединения или сигнала об остановке
+		if err == nil {
+			log.Debug().Msg("initialized...")
+			select {
+			case err = <-conn.NotifyClose(make(chan *amqp091.Error)):
+				log.Err(err).Msg("connection closed")
+			case <-ctx.Done(): // плановое завершение
+			}
+		} else {
+			log.Err(err).Msg("initialization")
+		}
+
+		conn.Close()                      // закрываем соединение
+		if err := ctx.Err(); err != nil { // отслеживаем плановую остановку сервиса
+			log.Debug().Str("reason", err.Error()).Msg("stopped...")
 			return nil
 		}
 		// осуществляем повторное соединение и инициализацию
@@ -73,7 +65,7 @@ func Run(ctx context.Context, addr string, workers ...ChannelHandler) error {
 // Init запускает асинхронное выполнение Run и ожидает завершения самого первого процесса инициализации,
 // после чего возвращает управление. Возвращает ошибку, если при первой инициализации обработчиков или установки
 // соединения произошла ошибка.
-func Init(ctx context.Context, addr string, workers ...ChannelHandler) error {
+func Init(ctx context.Context, addr string, workers ...Initializer) error {
 	var (
 		stop       = make(chan struct{})    // канал для отслеживания инициализации
 		end        = func() { close(stop) } // функция для закрытия канала
@@ -93,8 +85,7 @@ func Init(ctx context.Context, addr string, workers ...ChannelHandler) error {
 		err = Run(ctx, addr, append(workers, stopWorker)...)
 	}()
 
-	<-stop // ожидаем завершения инициализации или её ошибки
-	log.Debug().Str("module", "rabbitmq").Err(err).Msg("initialized")
+	<-stop     // ожидаем завершения инициализации или её ошибки
 	return err // возвращаем возможную ошибку первой инициализации
 }
 
@@ -115,3 +106,7 @@ func Work(ctx context.Context, addr string, queue *Queue, handler Handler, opts 
 	}
 	return pubFunc, nil // возвращаем функцию публикации
 }
+
+type logger struct{ zerolog.Logger }
+
+func (l logger) Printf(format string, v ...any) { l.Logger.Printf(format, v...) }

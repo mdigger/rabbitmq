@@ -21,20 +21,21 @@ var ErrNoChannel = errors.New("channel is not initialized")
 //
 // Если перед публикацией необходимо произвести некоторые настройки канала, то можно задать свою функцию инициализации
 // с помощью опции WithInit(ChannelHandler).
-func Publish(opts ...PublishOption) (Publisher, ChannelHandler) {
+func Publish(opts ...PublishOption) (Publisher, Initializer) {
 	log := log.With().Str("module", "rabbitmq").Logger()
 	log.Debug().Msg("init publisher")
 
 	options := getPublishOpts(opts)       // суммарные опции для публикации
 	var storedPublishingFunc atomic.Value // для ссылки на функцию публикации
 
-	// обработчик подключения
-	worker := func(ch *amqp091.Channel) error {
+	// функция инициализации подключения
+	initializer := func(ch *amqp091.Channel) error {
 		log.Debug().Msg("init publishing worker")
 
 		// запускаем функцию инициализации сразу после установки соединения, если такая функция задана
 		if options.init != nil {
 			if err := options.init(ch); err != nil {
+				log.Err(err).Msg("publishing initialization")
 				return err
 			}
 		}
@@ -51,7 +52,11 @@ func Publish(opts ...PublishOption) (Publisher, ChannelHandler) {
 
 	// функция для публикации новых сообщений
 	publisher := func(ctx context.Context, exchange, key string, msg amqp091.Publishing) error {
-		log.Debug().Str("key", key).Str("exchange", exchange).Msg("publishing")
+		log := log.Debug().Str("key", key)
+		if exchange != "" {
+			log = log.Str("exchange", exchange)
+		}
+		log.Msg("publishing")
 
 		publishingFunc := storedPublishingFunc.Load() // получаем функцию для публикации
 		if publishingFunc == nil {
@@ -85,20 +90,20 @@ func Publish(opts ...PublishOption) (Publisher, ChannelHandler) {
 		return publishingFunc.(Publisher)(ctx, exchange, key, msg) // публикуем
 	}
 
-	return publisher, worker
+	return publisher, initializer
 }
 
 // publishOptions описывает дополнительный параметры публикации.
 type publishOptions struct {
 	mandatory    bool
 	immediate    bool
-	timestamp    bool           // добавлять время в сообщение
-	init         ChannelHandler // функция инициализации
-	appID        string         // идентификатор приложения
-	replyToQueue *Queue         // очередь для ответа
-	replyTo      string         // название очереди для ответа
-	expiration   string         // время жизни сообщения
-	ttl          time.Duration  // время жизни сообщения
+	timestamp    bool          // добавлять время в сообщение
+	init         Initializer   // функция инициализации
+	appID        string        // идентификатор приложения
+	replyToQueue *Queue        // очередь для ответа
+	replyTo      string        // название очереди для ответа
+	expiration   string        // время жизни сообщения
+	ttl          time.Duration // время жизни сообщения
 }
 
 type PublishOption func(*publishOptions)
@@ -150,7 +155,7 @@ func WithTimestamp() PublishOption {
 }
 
 // WithInit задаёт функцию для инициализации канала при подключении.
-func WithInit(v ChannelHandler) PublishOption {
+func WithInit(v Initializer) PublishOption {
 	return func(c *publishOptions) {
 		c.init = v
 	}

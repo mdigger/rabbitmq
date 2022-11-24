@@ -12,12 +12,13 @@ type Handler = func(amqp091.Delivery)
 //
 // По умолчанию включено автоматическое подтверждение приёма сообщения.
 // Для его отключения используйте опцию WithNoAutoAck(true).
-func Consume(queue *Queue, handler Handler, opts ...ConsumeOption) ChannelHandler {
+func Consume(queue *Queue, handler Handler, opts ...ConsumeOption) Initializer {
 	log := log.With().Str("module", "rabbitmq").Stringer("queue", queue).Logger()
 	log.Debug().Msg("init consumer")
 
 	options := getConsumeOptions(opts) // обобщаем параметры настройки
-	worker := func(ch *amqp091.Channel) error {
+	// функция инициализации соединения
+	initializer := func(ch *amqp091.Channel) error {
 		// инициализируем настройки для очереди
 		if err := queue.declare(ch); err != nil {
 			return err
@@ -38,15 +39,18 @@ func Consume(queue *Queue, handler Handler, opts ...ConsumeOption) ChannelHandle
 			return err
 		}
 
-		// получаем сообщения и вызываем их обработчик
-		for msg := range consumer {
-			handler(msg)
-		}
+		go func() {
+			// получаем сообщения и вызываем их обработчик
+			for msg := range consumer {
+				handler(msg)
+			}
+			log.Debug().Msg("consumer worker closed")
+		}()
 
 		return nil
 	}
 
-	return worker
+	return initializer
 }
 
 // consumeOptions описывает поддерживаемые параметры для инициализации обработки сообщений.

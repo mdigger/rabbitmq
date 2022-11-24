@@ -48,6 +48,7 @@ func Example() {
 	}
 
 	<-ctx.Done()
+	time.Sleep(time.Second)
 
 	// Output:
 	// <- msg.01
@@ -60,7 +61,7 @@ func Example() {
 
 func ExampleWork() {
 	// инициализируем контекст для выполнения
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute/10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute/11)
 	defer cancel()
 
 	const queueName = "test.queue" // название очереди с сообщениями
@@ -91,6 +92,7 @@ func ExampleWork() {
 	}
 
 	<-ctx.Done()
+	time.Sleep(time.Second)
 
 	// Output:
 	// <- msg.01

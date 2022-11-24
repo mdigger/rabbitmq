@@ -50,6 +50,6 @@ func (q *Queue) declare(ch *amqp091.Channel) error {
 }
 
 // Consume возвращает инициализированный обработчик входящих сообщений данной очереди.
-func (q *Queue) Consume(handler func(amqp091.Delivery), opts ...ConsumeOption) ChannelHandler {
+func (q *Queue) Consume(handler func(amqp091.Delivery), opts ...ConsumeOption) Initializer {
 	return Consume(q, handler, opts...)
 }
