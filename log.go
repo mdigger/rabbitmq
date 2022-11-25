@@ -8,14 +8,9 @@ import (
 // log используется как лог для библиотеки
 var log = zerolog.Nop()
 
-// SetLogger задаёт лог библиотеки.
-// Не является потокобезопасным методом.
-// Рекомендуется переопределять перед началом работы с библиотекой.
+// SetLogger настраивает публикацию логов работы.
+// Не является потокобезопасным методом и рекомендуется переопределять перед началом работы с библиотекой.
 func SetLogger(l zerolog.Logger) {
-	log = l
-	amqp091.SetLogger(logger{Logger: log})
+	log = l                 // устанавливаем лог по умолчанию
+	amqp091.SetLogger(&log) // задаём лог для самой библиотеки amqp091-go
 }
-
-type logger struct{ zerolog.Logger }
-
-func (l logger) Printf(format string, v ...any) { l.Logger.Printf(format, v...) }

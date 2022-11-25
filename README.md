@@ -15,36 +15,27 @@
 воспользоваться вспомогательной функцией `Work`.
 
 ```golang
-// инициализируем контекст для выполнения
-ctx, cancel := context.WithTimeout(context.Background(), time.Minute/6)
-defer cancel()
+const queueName = "test.queue"          // название очереди с сообщениями
+queue := rabbitmq.NewQueue(queueName)   // создаём описание очереди
+handler := func(msg amqp091.Delivery) { // обработчик входящих сообщений
+    fmt.Println("->", msg.MessageId)
+}
 
-const queueName = "test.queue" // название очереди с сообщениями
 // подключаемся к серверу и запускаем автоматическую обработку входящих сообщений
-pubFunc, err := rabbitmq.Work(ctx,
-    "amqp://guest:guest@localhost:5672/", // адрес сервера для подключения
-    rabbitmq.NewQueue(queueName),         // очередь с входящими сообщениями
-    func(msg amqp091.Delivery) { // обработчик входящих сообщений
-        fmt.Println("->", msg.MessageId)
-    })
+pubFunc, err := rabbitmq.Work(ctx, addr, queue, handler)
 if err != nil {
     panic(err)
 }
 
-// публикуем сообщения
-for i := 1; i <= 3; i++ {
-    time.Sleep(time.Second)
-    msg := amqp091.Publishing{
-        MessageId:   fmt.Sprintf("msg.%02d", i),
-        ContentType: "text/plain",
-        Body:        []byte("data"),
-    }
-    err := pubFunc(ctx, "", queueName, msg) // вызываем функцию публикации
-    if err != nil {
-        panic(err)
-    }
-    fmt.Println("<-", msg.MessageId)
+// формируем сообщение для отправки
+msg := amqp091.Publishing{
+    MessageId:   "msg.test",
+    ContentType: "text/plain",
+    Body:        []byte("data"),
 }
-
-<-ctx.Done()
+// вызываем функцию публикации
+err = pubFunc(ctx, "", queueName, msg)
+if err != nil {
+    panic(err)
+}
 ```

@@ -103,77 +103,69 @@ type publishOptions struct {
 	appID        string        // идентификатор приложения
 	replyToQueue *Queue        // очередь для ответа
 	replyTo      string        // название очереди для ответа
-	expiration   string        // время жизни сообщения
 	ttl          time.Duration // время жизни сообщения
-}
-
-type PublishOption func(*publishOptions)
-
-func WithMandatory() PublishOption {
-	return func(c *publishOptions) {
-		c.mandatory = true
-	}
-}
-
-func WithImmediate() PublishOption {
-	return func(c *publishOptions) {
-		c.immediate = true
-	}
-}
-
-// WithAppID задаёт идентификатор приложения, добавляемый во все отправляемые сообщения,
-// перезаписывая любые ранее заданные в сообщении значения.
-func WithAppID(v string) PublishOption {
-	return func(c *publishOptions) {
-		c.appID = v
-	}
-}
-
-// WithReplyTo автоматически заполняет во всех отправляемых сообщениях поле ReplyTo заданным значением,
-// если оно не заполнено в сообщении.
-func WithReplyTo(v string) PublishOption {
-	return func(c *publishOptions) {
-		c.replyTo = v
-	}
-}
-
-// WithReplyQueue заполняет поле ReplyTo во всех сообщениях именем указанной очереди.
-// Если имя очереди меняется, то для всех новых сообщений так же будет использовано новое имя.
-//
-// При одновременном использовании с WithReplyTo, очередь имеет больший приоритет и будет
-// использоваться именно она.
-func WithReplyQueue(v *Queue) PublishOption {
-	return func(c *publishOptions) {
-		c.replyToQueue = v
-	}
-}
-
-// WithTimestamp добавляет временную метку перед отправкой сообщения, если она не задана.
-func WithTimestamp() PublishOption {
-	return func(c *publishOptions) {
-		c.timestamp = true
-	}
-}
-
-// WithInit задаёт функцию для инициализации канала при подключении.
-func WithInit(v Initializer) PublishOption {
-	return func(c *publishOptions) {
-		c.init = v
-	}
-}
-
-// WithTTL задаёт ограничение по времени жизни сообщения.
-func WithTTL(v time.Duration) PublishOption {
-	return func(c *publishOptions) {
-		c.ttl = v
-	}
 }
 
 // getOptions возвращает настройки после применения всех изменений.
 func getPublishOpts(opts []PublishOption) publishOptions {
 	var options publishOptions
 	for _, opt := range opts {
-		opt(&options)
+		opt.apply(&options)
 	}
 	return options
+}
+
+// PublishOption изменяет настройки публикации сообщений.
+type PublishOption interface{ apply(*publishOptions) }
+
+type funcPublishOption struct{ f func(*publishOptions) }
+
+func (fco *funcPublishOption) apply(co *publishOptions) { fco.f(co) }
+
+func newFuncPublishOption(f func(*publishOptions)) *funcPublishOption {
+	return &funcPublishOption{f: f}
+}
+
+func WithMandatory() PublishOption {
+	return newFuncPublishOption(func(c *publishOptions) { c.mandatory = true })
+}
+
+func WithImmediate() PublishOption {
+	return newFuncPublishOption(func(c *publishOptions) { c.immediate = true })
+}
+
+// WithAppID задаёт идентификатор приложения, добавляемый во все отправляемые сообщения,
+// перезаписывая любые ранее заданные в сообщении значения.
+func WithAppID(v string) PublishOption {
+	return newFuncPublishOption(func(c *publishOptions) { c.appID = v })
+}
+
+// WithReplyTo автоматически заполняет во всех отправляемых сообщениях поле ReplyTo заданным значением,
+// если оно не заполнено в сообщении.
+func WithReplyTo(v string) PublishOption {
+	return newFuncPublishOption(func(c *publishOptions) { c.replyTo = v })
+}
+
+// WithReplyToQueue заполняет поле ReplyTo во всех сообщениях именем указанной очереди.
+// Если имя очереди меняется, то для всех новых сообщений так же будет использовано новое имя.
+//
+// При одновременном использовании с WithReplyTo, очередь имеет больший приоритет и будет
+// использоваться именно она.
+func WithReplyToQueue(v *Queue) PublishOption {
+	return newFuncPublishOption(func(c *publishOptions) { c.replyToQueue = v })
+}
+
+// WithTimestamp добавляет временную метку перед отправкой сообщения, если она не задана.
+func WithTimestamp() PublishOption {
+	return newFuncPublishOption(func(c *publishOptions) { c.timestamp = true })
+}
+
+// WithInit задаёт функцию для инициализации канала при подключении.
+func WithInit(v Initializer) PublishOption {
+	return newFuncPublishOption(func(c *publishOptions) { c.init = v })
+}
+
+// WithTTL задаёт ограничение по времени жизни сообщения.
+func WithTTL(v time.Duration) PublishOption {
+	return newFuncPublishOption(func(c *publishOptions) { c.ttl = v })
 }

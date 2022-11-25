@@ -9,24 +9,79 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 )
 
+const addr = "amqp://guest:guest@localhost:5672/" // адрес для подключения к серверу
+
+var ctx = context.Background() // контекст выполнения работы
+
 func Example() {
 	// инициализируем контекст для выполнения
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute/10)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute/10)
 	defer cancel()
 
-	// объявляем очередь
+	const queueName = "test.queue"          // название очереди с сообщениями
+	queue := rabbitmq.NewQueue(queueName)   // создаём описание очереди
+	handler := func(msg amqp091.Delivery) { // обработчик входящих сообщений
+		fmt.Println("->", msg.MessageId)
+	}
+
+	// подключаемся к серверу и запускаем автоматическую обработку входящих сообщений
+	pubFunc, err := rabbitmq.Work(ctx, addr, queue, handler)
+	if err != nil {
+		panic(err)
+	}
+
+	// публикуем сообщения
+	for i := 1; i <= 3; i++ {
+		// формируем сообщение
+		msg := amqp091.Publishing{
+			MessageId:   fmt.Sprintf("msg.%02d", i),
+			ContentType: "text/plain",
+			Body:        []byte("data"),
+		}
+		// вызываем функцию публикации
+		err := pubFunc(ctx, "", queueName, msg)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("<-", msg.MessageId)
+	}
+
+	<-ctx.Done()
+
+	// Output:
+	// <- msg.01
+	// <- msg.02
+	// <- msg.03
+	// -> msg.01
+	// -> msg.02
+	// -> msg.03
+}
+
+func ExampleConsume() {
+	// функция для обработки входящих сообщений
+	handler := func(msg amqp091.Delivery) {
+		fmt.Println("->", msg.MessageId)
+		msg.Ack(false) // подтверждаем обработку сообщения
+	}
+	// создаём описание очереди
 	queue := rabbitmq.NewQueue("test.queue")
 	// инициализируем для этой очереди обработчик входящих сообщений и получаем worker
-	consumerWorker := queue.Consume(func(msg amqp091.Delivery) {
-		fmt.Println("->", msg.MessageId)
-	})
+	consumerWorker := queue.Consume(handler, rabbitmq.WithNoAutoAck())
+	// подключаемся к серверу и запускаем работу наших обработчиков
+	err := rabbitmq.Init(ctx, addr, consumerWorker)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func ExamplePublish() {
 	// инициализируем функцию публикации новых сообщений и соответствующий ей обработчик
 	pubFunc, pubWorker := rabbitmq.Publish(
 		rabbitmq.WithTTL(time.Minute),
 		rabbitmq.WithTimestamp())
 
 	// подключаемся к серверу и запускаем работу наших обработчиков
-	err := rabbitmq.Init(ctx, "amqp://guest:guest@localhost:5672/", consumerWorker, pubWorker)
+	err := rabbitmq.Init(ctx, addr, pubWorker)
 	if err != nil {
 		panic(err)
 	}
@@ -39,66 +94,35 @@ func Example() {
 			Body:        []byte("data"),
 		}
 		// отправляем сообщения в нашу очередь
-		err := pubFunc(ctx, "", queue.String(), msg)
+		err := pubFunc(ctx, "", "test.queue", msg)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("<-", msg.MessageId)
-		time.Sleep(time.Second)
 	}
-
-	<-ctx.Done()
-	time.Sleep(time.Second)
-
-	// Output:
-	// <- msg.01
-	// -> msg.01
-	// <- msg.02
-	// -> msg.02
-	// <- msg.03
-	// -> msg.03
 }
 
 func ExampleWork() {
-	// инициализируем контекст для выполнения
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute/11)
-	defer cancel()
+	const queueName = "test.queue"          // название очереди с сообщениями
+	queue := rabbitmq.NewQueue(queueName)   // создаём описание очереди
+	handler := func(msg amqp091.Delivery) { // обработчик входящих сообщений
+		fmt.Println("->", msg.MessageId)
+	}
 
-	const queueName = "test.queue" // название очереди с сообщениями
 	// подключаемся к серверу и запускаем автоматическую обработку входящих сообщений
-	pubFunc, err := rabbitmq.Work(ctx,
-		"amqp://guest:guest@localhost:5672/", // адрес сервера для подключения
-		rabbitmq.NewQueue(queueName),         // очередь с входящими сообщениями
-		func(msg amqp091.Delivery) { // обработчик входящих сообщений
-			fmt.Println("->", msg.MessageId)
-		})
+	pubFunc, err := rabbitmq.Work(ctx, addr, queue, handler)
 	if err != nil {
 		panic(err)
 	}
 
-	// публикуем сообщения
-	for i := 1; i <= 3; i++ {
-		time.Sleep(time.Second)
-		msg := amqp091.Publishing{
-			MessageId:   fmt.Sprintf("msg.%02d", i),
-			ContentType: "text/plain",
-			Body:        []byte("data"),
-		}
-		err := pubFunc(ctx, "", queueName, msg) // вызываем функцию публикации
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println("<-", msg.MessageId)
+	// формируем сообщение для отправки
+	msg := amqp091.Publishing{
+		MessageId:   "msg.test",
+		ContentType: "text/plain",
+		Body:        []byte("data"),
 	}
-
-	<-ctx.Done()
-	time.Sleep(time.Second)
-
-	// Output:
-	// <- msg.01
-	// -> msg.01
-	// <- msg.02
-	// -> msg.02
-	// <- msg.03
-	// -> msg.03
+	// вызываем функцию публикации
+	err = pubFunc(ctx, "", queueName, msg)
+	if err != nil {
+		panic(err)
+	}
 }

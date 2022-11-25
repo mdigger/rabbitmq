@@ -10,7 +10,7 @@ type Handler = func(amqp091.Delivery)
 // Consume возвращает инициализированный обработчик входящих сообщений для указанной очереди.
 //
 // По умолчанию включено автоматическое подтверждение приёма сообщения.
-// Для его отключения используйте опцию WithNoAutoAck(true).
+// Для его отключения используйте опцию WithNoAutoAck().
 func Consume(queue *Queue, handler Handler, opts ...ConsumeOption) Initializer {
 	log := log.With().Stringer("queue", queue).Logger()
 	log.Debug().Msg("init consumer")
@@ -66,51 +66,46 @@ type consumeOptions struct {
 func getConsumeOptions(opts []ConsumeOption) consumeOptions {
 	var options consumeOptions
 	for _, opt := range opts {
-		opt(&options)
+		opt.apply(&options)
 	}
 	return options
 }
 
-// ConsumeOption описывает интерфейс функции для задания необязательных параметров при настройке обработчика
-// входящих сообщений.
-type ConsumeOption func(*consumeOptions)
+// ConsumeOption изменяет настройки получения сообщений.
+type ConsumeOption interface{ apply(*consumeOptions) }
+
+type funcConsumeOption struct{ f func(*consumeOptions) }
+
+func (fco *funcConsumeOption) apply(co *consumeOptions) { fco.f(co) }
+
+func newFuncConsumeOption(f func(*consumeOptions)) *funcConsumeOption {
+	return &funcConsumeOption{f: f}
+}
 
 // WithName задаёт имя обработчика сообщений.
 func WithName(v string) ConsumeOption {
-	return func(c *consumeOptions) {
-		c.name = v
-	}
+	return newFuncConsumeOption(func(c *consumeOptions) { c.name = v })
 }
 
 // WithNoAutoAck запрещает автоматическое подтверждение приёма сообщений.
 func WithNoAutoAck() ConsumeOption {
-	return func(c *consumeOptions) {
-		c.noAutoAck = true
-	}
+	return newFuncConsumeOption(func(c *consumeOptions) { c.noAutoAck = true })
 }
 
 // WithExclusive взводит флаг эксклюзивного доступа к очереди.
 func WithExclusive() ConsumeOption {
-	return func(c *consumeOptions) {
-		c.exclusive = true
-	}
+	return newFuncConsumeOption(func(c *consumeOptions) { c.exclusive = true })
 }
 
 func WithNoLocal() ConsumeOption {
-	return func(c *consumeOptions) {
-		c.noLocal = true
-	}
+	return newFuncConsumeOption(func(c *consumeOptions) { c.noLocal = true })
 }
 
 func WithNoWait() ConsumeOption {
-	return func(c *consumeOptions) {
-		c.noWait = true
-	}
+	return newFuncConsumeOption(func(c *consumeOptions) { c.noWait = true })
 }
 
 // WithArgs задает дополнительные параметры обработчика сообщений.
 func WithArgs(v amqp091.Table) ConsumeOption {
-	return func(c *consumeOptions) {
-		c.args = v
-	}
+	return newFuncConsumeOption(func(c *consumeOptions) { c.args = v })
 }
