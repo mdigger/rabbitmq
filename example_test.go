@@ -66,7 +66,7 @@ func ExampleConsume() {
 	// создаём описание очереди
 	queue := rabbitmq.NewQueue("test.queue")
 	// инициализируем для этой очереди обработчик входящих сообщений и получаем worker
-	consumerWorker := queue.Consume(handler, rabbitmq.WithNoAutoAck())
+	consumerWorker := rabbitmq.Consume(queue, handler, rabbitmq.WithNoAutoAck())
 	// подключаемся к серверу и запускаем работу наших обработчиков
 	err := rabbitmq.Init(ctx, addr, consumerWorker)
 	if err != nil {

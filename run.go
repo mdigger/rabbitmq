@@ -90,7 +90,7 @@ func Init(ctx context.Context, addr string, workers ...Initializer) error {
 // По умолчанию автоматически отсылается подтверждение о приёме входящих сообщений, а для исходящих заполняется
 // поле ReplyTo указанием на очередь входящих сообщений.
 func Work(ctx context.Context, addr string, queue *Queue, handler Handler, opts ...PublishOption) (Publisher, error) {
-	consumerWorker := queue.Consume(handler)                         // обработка входящих сообщений
+	consumerWorker := Consume(queue, handler)                        // обработка входящих сообщений
 	opts = append([]PublishOption{WithReplyToQueue(queue)}, opts...) // добавляем опцию публикации
 	pubFunc, pubWorker := Publish(opts...)                           // публикация новых
 	err := Init(ctx, addr, consumerWorker, pubWorker)                // запускаем подключение к серверу
