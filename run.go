@@ -76,8 +76,9 @@ func Init(ctx context.Context, addr string, workers ...Initializer) error {
 	go func() {
 		defer once.Do(end) // по окончании или ошибке тоже закрываем, если не дошло до нашего сервиса
 		// добавляем свой обработчик в конец, чтобы отследить окончание процесса инициализации
-		err := Run(ctx, addr, append(workers, stopWorker)...)
-		aerr.Store(err) // сохраняем ошибку
+		if err := Run(ctx, addr, append(workers, stopWorker)...); err != nil {
+			aerr.Store(err) // сохраняем ошибку
+		}
 	}()
 
 	<-stop // ожидаем завершения инициализации или её ошибки
