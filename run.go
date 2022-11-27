@@ -63,9 +63,9 @@ func Init(ctx context.Context, addr string, workers ...Initializer) error {
 		stop       = make(chan struct{})    // канал для отслеживания инициализации
 		end        = func() { close(stop) } // функция для закрытия канала
 		once       sync.Once                // для однократного закрытия канала
-		stopWorker = func(*amqp091.Channel) error {
-			once.Do(end) // закрываем канал при инициализации сервиса
-			return nil   // завершаем работу сервиса без ошибки
+		stopWorker = func(ch *amqp091.Channel) error {
+			defer once.Do(end) // закрываем наш канал для сигнализации о выполнении
+			return ch.Close()  // этот канал rabbitMQ больше не нужен
 		}
 		err error // отслеживаем ошибку первой инициализации сервисов при запуске
 	)
