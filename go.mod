@@ -3,7 +3,7 @@ module github.com/mdigger/rabbitmq
 go 1.18
 
 require (
-	github.com/rabbitmq/amqp091-go v1.5.0
+	github.com/rabbitmq/amqp091-go v1.14.0
 	github.com/rs/zerolog v1.28.0
 )
 
